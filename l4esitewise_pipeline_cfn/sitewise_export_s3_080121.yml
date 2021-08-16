@@ -1,0 +1,953 @@
+# Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: AWS template for IoT SiteWise export to S3.
+
+Conditions:
+  #SiteWise (and our lambda bucket) only exists in these regions
+  ValidRegion:
+    Fn::Or:
+      - Fn::Equals:
+          - Ref: AWS::Region
+          - us-east-1
+      - Fn::Equals:
+          - Ref: AWS::Region
+          - us-west-2
+      - Fn::Equals:
+          - Ref: AWS::Region
+          - eu-west-1
+      - Fn::Equals:
+          - Ref: AWS::Region
+          - eu-central-1
+      - Fn::Equals:
+          - Ref: AWS::Region
+          - ap-southeast-1
+      - Fn::Equals:
+          - Ref: AWS::Region
+          - ap-southeast-2
+      - Fn::Equals:
+          - Ref: AWS::Region
+          - cn-north-1
+      - Fn::Equals:
+          - Ref: AWS::Region
+          - ap-south-1
+      - Fn::Equals:
+          - Ref: AWS::Region
+          - ap-northeast-1
+      - Fn::Equals:
+          - Ref: AWS::Region
+          - ap-northeast-2
+
+Parameters:
+  BucketPrefix:
+    Description: "The name of an Amazon S3 bucket that this stack creates for your asset data. This name must be unique across all existing bucket names in S3."
+    Default: "sitewise2s3"
+    AllowedPattern: '[a-z0-9\\-]+'
+    ConstraintDescription: "The global resource prefix can have between 3 and 23 characters. Valid characters: a-z, 0-9, and - (hyphen)"
+    Type: "String"
+    MinLength: 3
+    MaxLength: 63
+  GlobalResourcePrefix:
+    Description: "This prefix appears in the name of global resources that this stack creates (for example, Amazon S3 buckets and AWS IAM roles)."
+    Type: "String"
+    Default: "sitewise2s3"
+    AllowedPattern: '[a-z0-9\\-]+'
+    ConstraintDescription: "The global resource prefix can have between 3 and 23 characters. Valid characters: a-z, 0-9, and - (hyphen)"
+    MinLength: 3
+    MaxLength: 23
+  LocalResourcePrefix:
+    Description: "This prefix appears in the name of resources that this stack creates in this Region (for example, AWS Glue resources, an AWS IoT rule, and AWS Lambda functions)."
+    Type: "String"
+    Default: "sitewise2s3"
+    AllowedPattern: '[a-z0-9\\_]+'
+    ConstraintDescription: "The local resource prefix can have between 3 and 23 characters. Valid characters: a-z, 0-9, and _ (underscore)"
+    MinLength: 3
+    MaxLength: 23
+  codebucket:
+    Type: String
+    Description: S3 location for lambda function that you saved
+    MinLength: 3
+  SiteWiseAsset1Id:
+    Type: String
+    Description: AssetId for SiteWise asset1
+  SiteWiseAsset2Id: 
+    Type: String
+    Description: AssetId for SiteWise asset2
+  l4ebucketprefix:
+    Type: String
+    AllowedPattern: '[a-z0-9\\_]+'
+    ConstraintDescription: "The local resource prefix can have between 3 and 23 characters. Valid characters: a-z, 0-9, and _ (underscore)"
+    Description: Prefix to make L4E bucket unique
+Resources:
+  IoTSitewiseExportToS3DestinationBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Join
+        - "-"
+        - - !Sub ${BucketPrefix}
+          - !Select
+            - 0
+            - !Split
+              - "-"
+              - !Select
+                - 2
+                - !Split
+                  - "/"
+                  - !Ref "AWS::StackId"
+      AccessControl: Private
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+  IoTSitewiseExportToS3GlueDatabase:
+    Type: AWS::Glue::Database
+    Condition: ValidRegion
+    Properties:
+      CatalogId: !Sub ${AWS::AccountId}
+      DatabaseInput:
+        Description: Name of the Glue database
+        Name: !Sub ${LocalResourcePrefix}_firehose_glue_database
+
+  IotTSitewiseExportToS3GlueTable:
+    DependsOn: IoTSitewiseExportToS3GlueDatabase
+    Type: AWS::Glue::Table
+    Condition: ValidRegion
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref IoTSitewiseExportToS3GlueDatabase
+      TableInput:
+        Name: !Sub ${LocalResourcePrefix}_firehose_glue_table
+        TableType: EXTERNAL_TABLE
+        Parameters: { "classification": "parquet" }
+        StorageDescriptor:
+          Columns:
+            - Name: type
+              Type: string
+            - Name: asset_id
+              Type: string
+            - Name: asset_property_id
+              Type: string
+            - Name: time_in_seconds
+              Type: int
+            - Name: offset_in_nanos
+              Type: int
+            - Name: asset_property_quality
+              Type: string
+            - Name: asset_property_value
+              Type: string
+            - Name: asset_property_data_type
+              Type: string
+          InputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat
+          Location: !Sub
+            - "s3://${BucketName}/asset-property-updates/"
+            - { BucketName: !Ref IoTSitewiseExportToS3DestinationBucket }
+          SerdeInfo:
+            Parameters: { "serialization.format": "1" }
+            SerializationLibrary: org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe
+
+  IotTSitewiseExportToS3GlueTableMetadata:
+    DependsOn: IoTSitewiseExportToS3GlueDatabase
+    Type: AWS::Glue::Table
+    Condition: ValidRegion
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref IoTSitewiseExportToS3GlueDatabase
+      TableInput:
+        Name: !Sub ${LocalResourcePrefix}_firehose_glue_table_metadata
+        TableType: EXTERNAL_TABLE
+        Parameters: { "classification": "json" }
+        StorageDescriptor:
+          Columns:
+            - Name: asset_id
+              Type: string
+            - Name: asset_name
+              Type: string
+            - Name: asset_model_id
+              Type: string
+            - Name: asset_property_id
+              Type: string
+            - Name: asset_property_name
+              Type: string
+            - Name: asset_property_data_type
+              Type: string
+            - Name: asset_property_unit
+              Type: string
+            - Name: asset_property_alias
+              Type: string
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Location: !Sub
+            - "s3://${BucketName}/asset-metadata/"
+            - { BucketName: !Ref IoTSitewiseExportToS3DestinationBucket }
+          SerdeInfo:
+            Parameters: { "paths": "asset_id,asset_name,asset_model_id,asset_property_id,asset_property_name,asset_property_data_type,asset_property_unit,asset_property_alias" }
+            SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
+
+  IoTSiteWiseExportToS3TransformFunction:
+    Type: AWS::Lambda::Function
+    Condition: ValidRegion
+    Properties:
+      FunctionName: !Sub ${LocalResourcePrefix}_lambda_transform_function
+      Code:
+        S3Bucket: !Sub aws-iot-sitewise-${AWS::Region}
+        S3Key: exportToS3/transform_json_data.zip
+      Handler: transform_lambda.lambda_handler
+      MemorySize: 128
+      Role:
+        Fn::GetAtt: [IoTSiteWiseExportToS3TransformFunctionRole, Arn]
+      Runtime: python3.7
+      Timeout: 900
+
+  IoTSiteWiseExportToS3TransformFunctionRole:
+    Type: AWS::IAM::Role
+    Condition: ValidRegion
+    Properties:
+      RoleName: !Sub ${GlobalResourcePrefix}-lambda-transform-role
+      Description: Role for IoT SiteWise export to S3 transform Lambda function.
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: ["sts:AssumeRole"]
+            Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: !Sub ${GlobalResourcePrefix}-lambda-transform-policy
+          PolicyDocument:
+            Statement:
+              - Action:
+                  [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                    "logs:CreateLogGroup",
+                  ]
+                Effect: Allow
+                Resource:
+                  Fn::Sub: "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*"
+            Version: "2012-10-17"
+
+  IoTSiteWiseExportToS3TransformFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: IoTSiteWiseExportToS3TransformFunction
+    Condition: ValidRegion
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${IoTSiteWiseExportToS3TransformFunction}"
+
+  IoTSiteWiseExportToS3KinesisFirehoseDeliveryStream:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Condition: ValidRegion
+    Properties:
+      DeliveryStreamName: !Sub ${LocalResourcePrefix}_firehose_delivery_stream
+      DeliveryStreamType: DirectPut
+      ExtendedS3DestinationConfiguration:
+        RoleARN: !GetAtt IoTSiteWiseKinesisDeliveryRole.Arn
+        BucketARN: !GetAtt IoTSitewiseExportToS3DestinationBucket.Arn
+        BufferingHints:
+          SizeInMBs: "64"
+          IntervalInSeconds: "60"
+        CompressionFormat: UNCOMPRESSED
+        Prefix: asset-property-updates/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/
+        ErrorOutputPrefix: !Sub ${LocalResourcePrefix}_data_processing_error/
+        CloudWatchLoggingOptions:
+          Enabled: true
+          LogGroupName: !Ref IoTSiteWiseExportToS3FirehoseLogGroup
+          LogStreamName: S3Delivery
+        S3BackupMode: Disabled
+        ProcessingConfiguration:
+          Enabled: "true"
+          Processors:
+            - Parameters:
+                - ParameterName: LambdaArn
+                  ParameterValue: !GetAtt IoTSiteWiseExportToS3TransformFunction.Arn
+                - ParameterName: BufferSizeInMBs
+                  ParameterValue: 3
+                - ParameterName: BufferIntervalInSeconds
+                  ParameterValue: 60
+              Type: Lambda
+        DataFormatConversionConfiguration:
+          Enabled: true
+          InputFormatConfiguration:
+            Deserializer:
+              OpenXJsonSerDe: {}
+          OutputFormatConfiguration:
+            Serializer:
+              ParquetSerDe: {}
+          SchemaConfiguration:
+            CatalogId: !Ref AWS::AccountId
+            RoleARN: !GetAtt IoTSiteWiseKinesisDeliveryRole.Arn
+            DatabaseName: !Ref IoTSitewiseExportToS3GlueDatabase
+            Region: !Ref AWS::Region
+            TableName: !Ref IotTSitewiseExportToS3GlueTable
+            VersionId: LATEST
+  
+  IoTSiteWiseExportToS3FirehoseLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: ValidRegion
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/kinesisfirehose/${LocalResourcePrefix}_firehose_delivery_stream"
+
+  IoTSiteWiseExportToS3FirehoseLogStream:
+    Type: AWS::Logs::LogStream
+    Condition: ValidRegion
+    Properties:
+      LogGroupName: !Ref IoTSiteWiseExportToS3FirehoseLogGroup
+      LogStreamName: S3Delivery
+
+  IoTSiteWiseKinesisDeliveryRole:
+    Type: AWS::IAM::Role
+    Condition: ValidRegion
+    Properties:
+      RoleName: !Sub ${GlobalResourcePrefix}-firehose-delivery-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: ""
+            Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+            Action: "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                "sts:ExternalId": !Ref "AWS::AccountId"
+      Path: "/"
+      Policies:
+        - PolicyName: !Sub ${GlobalResourcePrefix}_firehose_delivery_policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "s3:GetBucketLocation"
+                  - "s3:GetObject"
+                  - "s3:ListBucket"
+                  - "s3:ListBucketMultipartUploads"
+                  - "s3:PutObject"
+                Resource:
+                  - !Sub
+                    - "${BucketArn}/*"
+                    - BucketArn: !GetAtt IoTSitewiseExportToS3DestinationBucket.Arn
+                  - !Sub
+                    - "${BucketArn}"
+                    - BucketArn: !GetAtt IoTSitewiseExportToS3DestinationBucket.Arn
+              - Effect: Allow
+                Action:
+                  - "glue:GetTableVersions"
+                  - "glue:GetTables"
+                  - "glue:GetTable"
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:catalog"
+                  - !Sub
+                    - "arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:database/${DatabaseName}"
+                    - { DatabaseName: !Ref IoTSitewiseExportToS3GlueDatabase }
+                  - !Sub
+                    - "arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:table/${DatabaseName}/${DatabaseTableName}"
+                    - DatabaseName: !Ref IoTSitewiseExportToS3GlueDatabase
+                      DatabaseTableName: !Ref IotTSitewiseExportToS3GlueTable
+              - Effect: Allow
+                Action:
+                  - "lambda:InvokeFunction"
+                  - "lambda:GetFunctionConfiguration"
+                Resource: !GetAtt IoTSiteWiseExportToS3TransformFunction.Arn
+              - Effect: Allow
+                Action: "logs:PutLogEvents"
+                Resource: !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*"
+
+  IoTSiteWiseExportToS3MetadataFunction:
+    Type: AWS::Lambda::Function
+    Condition: ValidRegion
+    Properties:
+      FunctionName: !Sub ${LocalResourcePrefix}_lambda_metadata_function
+      Code:
+        S3Bucket: !Sub aws-iot-sitewise-${AWS::Region}
+        S3Key: exportToS3/asset-metadata-script.zip
+      Handler: asset_metadata_lambda.lambda_handler
+      MemorySize: 128
+      Role:
+        Fn::GetAtt: [IoTSiteWiseExportToS3MetadataFunctionRole, Arn]
+      Runtime: python3.7
+      Timeout: 900
+
+  IoTSiteWiseExportToS3MetadataFunctionRole:
+    Type: AWS::IAM::Role
+    Condition: ValidRegion
+    Properties:
+      RoleName: !Sub ${GlobalResourcePrefix}-lambda-metadata-role
+      Description: Role for IoT SiteWise export to S3 metadata Lambda function.
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: ["sts:AssumeRole"]
+            Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: !Sub ${GlobalResourcePrefix}-lambda-metadata-policy
+          PolicyDocument:
+            Statement:
+              - Action:
+                  [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                    "logs:CreateLogGroup",
+                  ]
+                Effect: Allow
+                Resource:
+                  Fn::Sub: "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*"
+              - Action:
+                  - "iotsitewise:Describe*"
+                  - "iotsitewise:List*"
+                  - "iotsitewise:Get*"
+                Effect: Allow
+                Resource: "*"
+              - Action:
+                  - "s3:GetBucketLocation"
+                  - "s3:GetObject"
+                  - "s3:ListBucket"
+                  - "s3:PutObject"
+                Effect: Allow
+                Resource:
+                  - !Sub
+                    - "${BucketArn}/*"
+                    - BucketArn: !GetAtt IoTSitewiseExportToS3DestinationBucket.Arn
+                  - !Sub
+                    - "${BucketArn}"
+                    - BucketArn: !GetAtt IoTSitewiseExportToS3DestinationBucket.Arn
+            Version: "2012-10-17"
+
+  IoTSiteWiseExportToS3MetadataScheduledRule:
+    Type: AWS::Events::Rule
+    DependsOn: IoTSiteWiseExportToS3MetadataFunctionRole
+    Condition: ValidRegion
+    Properties:
+      Description: "Scheduled rule for metadata Lambda function"
+      Name: !Sub ${LocalResourcePrefix}_metadata_event
+      ScheduleExpression: "rate(1 minute)"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Fn::GetAtt: [IoTSiteWiseExportToS3MetadataFunction, Arn]
+          Id: IoTSiteWiseExportToS3MetadataFunction
+          Input:
+            Fn::Sub:
+              ' { "bucket_name" : "${IoTSitewiseExportToS3DestinationBucket}",
+                  "key_name_prefix" : "asset-metadata"
+              }'
+
+  IoTSiteWiseExportToS3MetadataEventPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn: IoTSiteWiseExportToS3MetadataFunctionRole
+    Condition: ValidRegion
+    Properties:
+      FunctionName:
+        Ref: "IoTSiteWiseExportToS3MetadataFunction"
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn:
+        Fn::GetAtt: [IoTSiteWiseExportToS3MetadataScheduledRule, Arn]
+
+  IoTSiteWiseExportToS3CoreRule:
+    Type: AWS::IoT::TopicRule
+    Condition: ValidRegion
+    Properties:
+      RuleName: !Sub ${LocalResourcePrefix}_iot_topic_rule
+      TopicRulePayload:
+        Actions:
+          - Firehose:
+              DeliveryStreamName: !Ref IoTSiteWiseExportToS3KinesisFirehoseDeliveryStream
+              RoleArn: !GetAtt IoTSiteWiseExportToS3CoreAccessToFirehoseRole.Arn
+              Separator: "\n"
+        AwsIotSqlVersion: 2016-03-23
+        RuleDisabled: "false"
+        Sql: >-
+          SELECT * FROM '$aws/sitewise/asset-models/+/assets/+/properties/+' WHERE type = 'PropertyValueUpdate'
+
+  IoTSiteWiseExportToS3CoreAccessToFirehoseRole:
+    Type: AWS::IAM::Role
+    Condition: ValidRegion
+    Properties:
+      RoleName: !Sub ${GlobalResourcePrefix}-core-firehose-role
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: iot.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub ${GlobalResourcePrefix}-core-firehose-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: !Sub
+                  - "arn:${AWS::Partition}:firehose:${AWS::Region}:${AWS::AccountId}:deliverystream/${DeliveryStreamName}"
+                  - DeliveryStreamName: !Ref IoTSiteWiseExportToS3KinesisFirehoseDeliveryStream
+                Effect: Allow
+                Action:
+                  - firehose:PutRecord
+  MyAthenaWorkGroup:
+    DependsOn: IotTSitewiseExportToS3GlueTableMetadata
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: l4esitewisequery
+      Description: SiteWise Athena workgroup
+      State: ENABLED
+      RecursiveDeleteOption: True
+      WorkGroupConfiguration:
+        PublishCloudWatchMetricsEnabled: true
+        ResultConfiguration:
+          OutputLocation: !Sub
+            - "s3://${Bucket}/athenaquery/"
+            - { Bucket: !Ref IoTSitewiseExportToS3DestinationBucket}
+  Pump1AthenaQuery: 
+    DependsOn: MyAthenaWorkGroup
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: 
+        Ref: IoTSitewiseExportToS3GlueDatabase
+      Description: "A query that select records from pump 1"
+      Name: "l4e_inference_data_pump1"
+      QueryString: >
+                    CREATE OR REPLACE VIEW l4e_inference_data_pump1 AS 
+                    SELECT "date_format"("date_trunc"('minute', "timestamp"), '%Y-%m-%dT%H:%i:%S.%f') "Timestamp"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor0') THEN "asset_property_value" ELSE null END)) AS double) "Sensor0"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor1') THEN "asset_property_value" ELSE null END)) AS double) "Sensor1"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor2') THEN "asset_property_value" ELSE null END)) AS double) "Sensor2"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor3') THEN "asset_property_value" ELSE null END)) AS double) "Sensor3"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor4') THEN "asset_property_value" ELSE null END)) AS double) "Sensor4"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor5') THEN "asset_property_value" ELSE null END)) AS double) "Sensor5"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor6') THEN "asset_property_value" ELSE null END)) AS double) "Sensor6"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor7') THEN "asset_property_value" ELSE null END)) AS double) "Sensor7"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor8') THEN "asset_property_value" ELSE null END)) AS double) "Sensor8"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor9') THEN "asset_property_value" ELSE null END)) AS double) "Sensor9"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor10') THEN "asset_property_value" ELSE null END)) AS double) "Sensor10"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor11') THEN "asset_property_value" ELSE null END)) AS double) "Sensor11"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor12') THEN "asset_property_value" ELSE null END)) AS double) "Sensor12"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor13') THEN "asset_property_value" ELSE null END)) AS double) "Sensor13"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor14') THEN "asset_property_value" ELSE null END)) AS double) "Sensor14"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor15') THEN "asset_property_value" ELSE null END)) AS double) "Sensor15"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor16') THEN "asset_property_value" ELSE null END)) AS double) "Sensor16"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor17') THEN "asset_property_value" ELSE null END)) AS double) "Sensor17"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor18') THEN "asset_property_value" ELSE null END)) AS double) "Sensor18"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor19') THEN "asset_property_value" ELSE null END)) AS double) "Sensor19"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor20') THEN "asset_property_value" ELSE null END)) AS double) "Sensor20"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor21') THEN "asset_property_value" ELSE null END)) AS double) "Sensor21"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor22') THEN "asset_property_value" ELSE null END)) AS double) "Sensor22"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor23') THEN "asset_property_value" ELSE null END)) AS double) "Sensor23"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor24') THEN "asset_property_value" ELSE null END)) AS double) "Sensor24"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor25') THEN "asset_property_value" ELSE null END)) AS double) "Sensor25"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor26') THEN "asset_property_value" ELSE null END)) AS double) "Sensor26"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor27') THEN "asset_property_value" ELSE null END)) AS double) "Sensor27"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor28') THEN "asset_property_value" ELSE null END)) AS double) "Sensor28"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor29') THEN "asset_property_value" ELSE null END)) AS double) "Sensor29"
+                    FROM( 
+                    SELECT "from_unixtime"(("time_in_seconds" + ("offset_in_nanos" / 1000000000))) "timestamp"
+                    , "metadata"."asset_name", "metadata"."asset_property_name", "data"."asset_property_value"
+                    , "metadata"."asset_property_unit", "metadata"."asset_property_alias"
+                    FROM (sitewise2s3_firehose_glue_database.sitewise2s3_firehose_glue_table data
+                    INNER JOIN sitewise2s3_firehose_glue_database.sitewise2s3_firehose_glue_table_metadata metadata ON (("data"."asset_id" = "metadata"."asset_id") AND ("data"."asset_property_id" = "metadata"."asset_property_id")))) 
+                    WHERE (("timestamp" > ("date_trunc"('minute', current_timestamp) - INTERVAL  '6' MINUTE)) AND ("asset_name" = 'Demo Pump Asset 1')) GROUP BY "timestamp" 
+      WorkGroup:   
+        Ref: MyAthenaWorkGroup                                              
+  Pump2AthenaQuery:
+    DependsOn: MyAthenaWorkGroup
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: 
+        Ref: IoTSitewiseExportToS3GlueDatabase
+      Description: "A query that select records from pump 2"
+      Name: "l4e_inference_data_pump2"
+      QueryString: >
+                    CREATE OR REPLACE VIEW l4e_inference_data_pump2 AS 
+                    SELECT "date_format"("date_trunc"('minute', "timestamp"), '%Y-%m-%dT%H:%i:%S.%f') "Timestamp"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor0') THEN "asset_property_value" ELSE null END)) AS double) "Sensor0"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor1') THEN "asset_property_value" ELSE null END)) AS double) "Sensor1"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor2') THEN "asset_property_value" ELSE null END)) AS double) "Sensor2"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor3') THEN "asset_property_value" ELSE null END)) AS double) "Sensor3"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor4') THEN "asset_property_value" ELSE null END)) AS double) "Sensor4"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor5') THEN "asset_property_value" ELSE null END)) AS double) "Sensor5"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor6') THEN "asset_property_value" ELSE null END)) AS double) "Sensor6"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor7') THEN "asset_property_value" ELSE null END)) AS double) "Sensor7"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor8') THEN "asset_property_value" ELSE null END)) AS double) "Sensor8"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor9') THEN "asset_property_value" ELSE null END)) AS double) "Sensor9"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor10') THEN "asset_property_value" ELSE null END)) AS double) "Sensor10"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor11') THEN "asset_property_value" ELSE null END)) AS double) "Sensor11"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor12') THEN "asset_property_value" ELSE null END)) AS double) "Sensor12"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor13') THEN "asset_property_value" ELSE null END)) AS double) "Sensor13"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor14') THEN "asset_property_value" ELSE null END)) AS double) "Sensor14"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor15') THEN "asset_property_value" ELSE null END)) AS double) "Sensor15"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor16') THEN "asset_property_value" ELSE null END)) AS double) "Sensor16"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor17') THEN "asset_property_value" ELSE null END)) AS double) "Sensor17"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor18') THEN "asset_property_value" ELSE null END)) AS double) "Sensor18"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor19') THEN "asset_property_value" ELSE null END)) AS double) "Sensor19"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor20') THEN "asset_property_value" ELSE null END)) AS double) "Sensor20"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor21') THEN "asset_property_value" ELSE null END)) AS double) "Sensor21"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor22') THEN "asset_property_value" ELSE null END)) AS double) "Sensor22"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor23') THEN "asset_property_value" ELSE null END)) AS double) "Sensor23"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor24') THEN "asset_property_value" ELSE null END)) AS double) "Sensor24"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor25') THEN "asset_property_value" ELSE null END)) AS double) "Sensor25"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor26') THEN "asset_property_value" ELSE null END)) AS double) "Sensor26"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor27') THEN "asset_property_value" ELSE null END)) AS double) "Sensor27"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor28') THEN "asset_property_value" ELSE null END)) AS double) "Sensor28"
+                    , CAST("max"((CASE WHEN ("asset_property_name" = 'Sensor29') THEN "asset_property_value" ELSE null END)) AS double) "Sensor29"
+                    FROM( 
+                    SELECT "from_unixtime"(("time_in_seconds" + ("offset_in_nanos" / 1000000000))) "timestamp"
+                    , "metadata"."asset_name", "metadata"."asset_property_name", "data"."asset_property_value"
+                    , "metadata"."asset_property_unit", "metadata"."asset_property_alias"
+                    FROM (sitewise2s3_firehose_glue_database.sitewise2s3_firehose_glue_table data
+                    INNER JOIN sitewise2s3_firehose_glue_database.sitewise2s3_firehose_glue_table_metadata metadata ON (("data"."asset_id" = "metadata"."asset_id") AND ("data"."asset_property_id" = "metadata"."asset_property_id")))) 
+                    WHERE (("timestamp" > ("date_trunc"('minute', current_timestamp) - INTERVAL  '6' MINUTE)) AND ("asset_name" = 'Demo Pump Asset 2')) GROUP BY "timestamp"
+      WorkGroup:  
+        Ref: MyAthenaWorkGroup    
+  InferenceScheduleLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${GlobalResourcePrefix}_InferenceSchedulerRole
+      Description: Role for lambda to trigger Athena
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+              Service: lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/AmazonAthenaFullAccess
+      - arn:aws:iam::aws:policy/AmazonS3FullAccess
+      Policies:  
+      - PolicyName: variousAccess
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:GetLogEvents
+            - logs:PutLogEvents
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - glue:*
+            Resource: '*'        
+  l4einferenceschedule:
+    Type: AWS::Lambda::Function
+    DependsOn: InferenceScheduleLambdaExecutionRole
+    Properties:
+      FunctionName: !Sub ${LocalResourcePrefix}_l4einferencescheduler
+      Handler: lambda_function.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - InferenceScheduleLambdaExecutionRole
+        - Arn
+      Runtime: python3.7
+      Code:
+        S3Bucket: !Sub ${codebucket}
+        S3Key: l4einference-schedule.zip
+      Description: >-
+        Lambda function to trigger Athena query and output data for L4E inference
+      MemorySize: 128
+      Timeout: 180
+      Layers:
+      - Ref: PandaLayer    
+  PandaLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      CompatibleRuntimes:
+      - python3.7
+      Content:
+        S3Bucket: !Sub ${codebucket}
+        S3Key: awswrangler-layer-2.10.0-py3.7.zip
+      Description: Pandas for Python
+      LayerName:
+        Fn::Sub: ${LocalResourcePrefix}_datawranglerlayer     
+  IoTSiteWiseScheduledRule1:
+    Type: AWS::Events::Rule
+    DependsOn: 
+      - l4einferenceschedule
+      - Pump1AthenaQuery
+    Properties:
+      Description: Executes the Inference Scheduler lambda every 5 minute to generate and put data into IoT SiteWise Demo assets
+      ScheduleExpression: cron(1/5 * * * ? *)
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Fn::GetAtt: [l4einferenceschedule, Arn]                                                                                        
+          Id: l4einferencescheduleFunction
+          Input: !Sub 
+            - '{"athena_output_bucket" : "${athena_Bucketname}","view_query_id":"${pump1query}", "l4e_bucket":"${l4e_bucket1name}", "assetId": "${SiteWiseAsset1Id}"}'
+            - { athena_Bucketname: !Ref IoTSitewiseExportToS3DestinationBucket, pump1query: !Ref Pump1AthenaQuery, l4e_bucket1name: !Ref L4eBucket1}
+  IoTSiteWiseScheduledRule2:
+    Type: AWS::Events::Rule
+    DependsOn: 
+      - l4einferenceschedule
+      - Pump2AthenaQuery
+    Properties:
+      Description: Executes the Inference Scheduler lambda every 5 minute to generate and put data into IoT SiteWise Demo assets
+      ScheduleExpression: cron(1/5 * * * ? *)
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Fn::GetAtt: [l4einferenceschedule, Arn]                                                                                        
+          Id: l4einferencescheduleFunction
+          Input: !Sub 
+            - '{"athena_output_bucket" : "${athena_Bucketname}", "view_query_id":"${pump2query}", "l4e_bucket":"${l4e_bucket2name}", "assetId": "${SiteWiseAsset2Id}"}'
+            - { athena_Bucketname: !Ref IoTSitewiseExportToS3DestinationBucket, pump2query: !Ref Pump2AthenaQuery, l4e_bucket2name: !Ref L4eBucket2}
+  IoTSiteWiseScheduledRule1PermissionToInvoke:
+    Type: AWS::Lambda::Permission
+    DependsOn: 
+      - l4einferenceschedule
+      - IoTSiteWiseScheduledRule1
+    Properties:
+      FunctionName:
+        Ref: l4einferenceschedule
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt: [IoTSiteWiseScheduledRule1, Arn]  
+  IoTSiteWiseScheduledRule2PermissionToInvoke:
+    Type: AWS::Lambda::Permission
+    DependsOn: 
+      - l4einferenceschedule
+      - IoTSiteWiseScheduledRule2
+    Properties:
+      FunctionName:
+        Ref: l4einferenceschedule
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt: [IoTSiteWiseScheduledRule2, Arn]         
+  L4E2SiteWiseLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${GlobalResourcePrefix}_L4E2SiteWiseRole
+      Description: Role for lambda to write l4e back to sitewise
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/AmazonS3FullAccess
+      - arn:aws:iam::aws:policy/AWSIoTSiteWiseFullAccess   
+      Policies:         
+      - PolicyName: logAccess
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:GetLogEvents
+            - logs:PutLogEvents
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            Resource: '*'                 
+  l4einferenceoutput:
+    Type: AWS::Lambda::Function
+    DependsOn: L4E2SiteWiseLambdaExecutionRole
+    Properties:
+      FunctionName: !Sub ${LocalResourcePrefix}_l4einferenceoutput
+      Handler: lambda_function.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - L4E2SiteWiseLambdaExecutionRole
+        - Arn
+      Runtime: python3.7
+      Code:
+        S3Bucket: !Sub ${codebucket}
+        S3Key: l4eoutput-2sitewise.zip
+      Description: >-
+        An Amazon S3 trigger that retrieves L4e output to s3 
+      MemorySize: 128
+      Timeout: 180
+      Environment:
+        Variables:
+          Asset_L4E_Score: Asset L4E Score
+  L4eBucket1:
+    Type: AWS::S3::Bucket
+    DependsOn:
+      - l4einferenceoutput
+      - l4einferenceoutputS3l4eBucket1Permission
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Sub ${l4ebucketprefix}-asset1-train-inference
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: 's3:ObjectCreated:Put'
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: .jsonl
+            Function: !GetAtt l4einferenceoutput.Arn
+  L4eBucket2:
+    Type: AWS::S3::Bucket
+    DependsOn:
+      - l4einferenceoutput
+      - l4einferenceoutputS3l4eBucket2Permission
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Sub ${l4ebucketprefix}-asset2-train-inference
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: 's3:ObjectCreated:Put'
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: .jsonl
+            Function: !GetAtt l4einferenceoutput.Arn
+  l4einferenceoutputS3l4eBucket1Permission:
+    Type: AWS::Lambda::Permission
+    DependsOn: 
+      - l4einferenceoutput
+    Properties:
+      FunctionName: !GetAtt l4einferenceoutput.Arn
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !Sub arn:aws:s3:::${l4ebucketprefix}-asset1-train-inference
+  l4einferenceoutputS3l4eBucket2Permission:
+    Type: AWS::Lambda::Permission
+    DependsOn: 
+      - l4einferenceoutput
+    Properties:
+      FunctionName: !GetAtt l4einferenceoutput.Arn
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !Sub arn:aws:s3:::${l4ebucketprefix}-asset2-train-inference
+  SageMakerIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: 
+              Service:
+                - sagemaker.amazonaws.com
+                - lookoutequipment.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonSageMakerFullAccess"
+        - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+        - "arn:aws:iam::aws:policy/IAMFullAccess"
+        - "arn:aws:iam::aws:policy/AmazonSSMFullAccess"
+        - "arn:aws:iam::aws:policy/AmazonLookoutEquipmentFullAccess"
+      Path: /
+      Policies:
+        - PolicyName: LookoutForEquipment
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'iam:PassRole'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 's3:Get*'
+                  - 's3:List*'
+                  - 's3:PutObject'
+                Resource: arn:aws:s3:::*
+                Sid: TrainingAndLabelDataAccess  
+  NotebookInstance:
+    Type: AWS::SageMaker::NotebookInstance
+    DependsOn:
+      - SageMakerIamRole
+    Properties:
+      InstanceType: ml.m5.xlarge
+      RoleArn: !GetAtt SageMakerIamRole.Arn
+      NotebookInstanceName: !Join
+        - "-"
+        - - "lookout-equipment-getting-started"
+          - !Select
+            - 0
+            - !Split
+              - "-"
+              - !Select
+                - 2
+                - !Split
+                  - "/"
+                  - !Ref "AWS::StackId"
+      VolumeSizeInGB: 5
+      DefaultCodeRepository: 'https://github.com/aws-samples/amazon-lookout-for-equipment.git'                                
+Outputs:
+  SitewiseExportToS3DestinationBucket:
+    Description: S3 bucket used for SiteWise value Outputs
+    Value:
+      Ref: IoTSitewiseExportToS3DestinationBucket   
+  SitewiseExportToS3GlueDatabase:       
+    Description: GlueDatabase for schema
+    Value:
+      Ref: IoTSitewiseExportToS3GlueDatabase
+  SitewiseExportToS3GlueTable:
+    Description: GlueTable for SiteWise property updates
+    Value:
+      Ref: IotTSitewiseExportToS3GlueTable
+  SitewiseExportToS3GlueTableMetadata:  
+    Description: Meta data GlueTable for SiteWise asset model metadata
+    Value:
+      Ref: IotTSitewiseExportToS3GlueTableMetadata
+  AthenaWorkGroup:    
+    Description: Athena Workshop with s3 output
+    Value:
+      Ref: MyAthenaWorkGroup
+  InferenceSchedulerLambdaFunction:
+    Description: The name of the step function to generate asset models and assets
+    Value:
+      Ref: l4einferenceschedule  
+  L4EInferenceOutputLambdaFunction:
+    Description: The name of the step function to fetch L4E output to SiteWise
+    Value:
+      Ref: l4einferenceoutput
+  Asset1L4EInferenceResultBucket:
+    Description: S3 bucket used for L4E inference result Outputs for Asset 1
+    Value:
+      Ref: L4eBucket1
+  Asset2L4EInferenceResultBucket:
+    Description: S3 bucket used for L4E inference result Outputs for Asset 1
+    Value:
+      Ref: L4eBucket2    
+  NotebookInstanceId:
+    Description: The notebook instance resource
+    Value: 
+      Ref NotebookInstance       
+
