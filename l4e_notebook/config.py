@@ -2,14 +2,15 @@
 # to store the intermediate results of this getting
 # started:
 
-BUCKET                   = 'l4e-sitewise-d7bf5fa0'
+BUCKET                   = '<<YOUR_BUCKET>>'
+ASSET_ID                 = '<<ASSET_ID_FROM_SITEWISE_SIMULATOR_CF_STACK>>'
 
 # You can leave these other parameters to these
 # default values:
 
-PREFIX_TRAINING          = '97978334-97be-4e45-bf5d-84d9e535a601/training-data/'
-PREFIX_LABEL             = '97978334-97be-4e45-bf5d-84d9e535a601/label-data/'
-PREFIX_INFERENCE         = '97978334-97be-4e45-bf5d-84d9e535a601/inference-data'
-DATASET_NAME             = '97978334-97be-4e45-bf5d-84d9e535a601'
+PREFIX_TRAINING          = f'{ASSET_ID}/training-data/'
+PREFIX_LABEL             = f'{ASSET_ID}/label-data/'
+PREFIX_INFERENCE         = f'{ASSET_ID}/inference-data'
+DATASET_NAME             = f'{ASSET_ID}'
 MODEL_NAME               = f'{DATASET_NAME}-model'
 INFERENCE_SCHEDULER_NAME = f'{DATASET_NAME}-scheduler'
