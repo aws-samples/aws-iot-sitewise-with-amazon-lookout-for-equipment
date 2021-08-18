@@ -11,7 +11,7 @@ Once you have done that, open one of the link below (depending on the region clo
 
 | Region |     | CloudFormation Stack |
 | ---    | --- | --- |
-| US East (N. Virginia) | **us-east-1** | [![Launch stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=LookoutForEquipmentSitewiseIntegration&templateURL=https://github.com/aws-samples/aws-iot-sitewise-with-amazon-lookout-for-equipment/blob/main/l4esitewise_pipeline_cfn/sitewise_export_s3_080121.yml) |
+| US East (N. Virginia) | **us-east-1** | [![Launch stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=LookoutForEquipmentSitewiseIntegration&templateURL=https://lookoutforequipmentbucket-us-east-1.s3.amazonaws.com/cloud-formation-templates/sitewise_export_s3_080121.yml) |
 
 
 ## Security
