@@ -892,7 +892,7 @@ Resources:
                   - "/"
                   - !Ref "AWS::StackId"
       VolumeSizeInGB: 5
-      DefaultCodeRepository: 'https://github.com/aws-samples/amazon-lookout-for-equipment.git'                                
+      DefaultCodeRepository: 'https://github.com/aws-samples/aws-iot-sitewise-with-amazon-lookout-for-equipment'                                
 Outputs:
   SitewiseExportToS3DestinationBucket:
     Description: S3 bucket used for SiteWise value Outputs
