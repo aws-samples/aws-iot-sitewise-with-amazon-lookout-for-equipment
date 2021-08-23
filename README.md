@@ -24,10 +24,11 @@ After you setup the IoT SiteWise simulator with the above cloudformation, you ca
 | US East (N. Virginia) | **us-east-1** | [![Launch stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=LookoutForEquipmentSitewisePipeline&templateURL=https://lookoutforequipmentbucket-us-east-1.s3.amazonaws.com/cloud-formation-templates/sitewise_export_s3.yml) |
 
 This data pipeline comprises of four parts: 
-•	Stream AWS IoT SiteWise data to Amazon Simple Storage Service (S3) in near real time;
-•	Use AWS Lambda function to trigger Amazon Athena at scheduled time to reformat exported IoT SiteWise data in S3, and output data as CSV file for Lookout for Equipment inference scheduler to ingest;
-•	After Lookout for Equipment inference finished, use Lambda function to ingest Lookout for Equipment output data to specific measurement tags in IoT SiteWise;
-•	Setup AWS resources for running Lookout for Equipment service (e.g. Amazon SageMaker Notebook and S3 bucket).
+* Stream AWS IoT SiteWise data to Amazon Simple Storage Service (S3) in near real time;
+* Use AWS Lambda function to trigger Amazon Athena at scheduled time to reformat exported IoT SiteWise data in S3, and output data as CSV file for Lookout for Equipment inference scheduler to ingest;
+* After Lookout for Equipment inference finished, use Lambda function to ingest Lookout for Equipment output data to specific measurement tags in IoT SiteWise;
+* Setup AWS resources for running Lookout for Equipment service (e.g. Amazon SageMaker Notebook and S3 bucket).
+
 ## Security
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
