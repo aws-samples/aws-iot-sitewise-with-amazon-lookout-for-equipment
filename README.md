@@ -29,6 +29,11 @@ This data pipeline comprises of four parts:
 * After Lookout for Equipment inference finished, use Lambda function to ingest Lookout for Equipment output data to specific measurement tags in IoT SiteWise;
 * Setup AWS resources for running Lookout for Equipment service (e.g. Amazon SageMaker Notebook and S3 bucket).
 
+## Considerations for Practical Implementations
+
+For demonstration purpose, an AWS IoT SiteWise simulator is used to simulate the measurement value updates for industrial asset in this blog. For real industrial applications, OT team can configure data sources, such as OPC-UA server, to ingest asset data to AWS IoT SiteWise. 
+In this demo, an asset group with two level of hierarchy deployed. In reality, the number of hierarchies and the number of assets within each hierarchy can be significantly more (https://docs.aws.amazon.com/general/latest/gr/iot-sitewise.html). However, since Lambda functions used in data engineering pipeline can be scaled up to meet the demand with concurrent invocations of Lambda functions, so this solution can be easily extended to large scale industrial assets.
+
 ## Security
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
