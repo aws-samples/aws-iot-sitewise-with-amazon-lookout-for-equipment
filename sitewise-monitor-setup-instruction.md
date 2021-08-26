@@ -1,4 +1,4 @@
-                                  ## SiteWise Monitor Setup Instruction
+                                    SiteWise Monitor Setup Instruction
 ## About
 
 Follow the steps in this file to create your AWS IoT SiteWise Monitor portal so you can visualize device performance metrics and results of the machine learning inferences returned by Amazon Lookout for Equipment.
