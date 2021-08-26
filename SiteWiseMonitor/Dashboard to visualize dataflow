@@ -1,3 +1,5 @@
+Instruction to Create the SiteWise dashboard to visualize SiteWise data flow
+
 1. Select "Create dashboard",
 2. Expand "Demo Pump Station Asset" under "Asset",
 3. Click "Demo Pump Asset 1", you should be able to see all asset properties associated with this asset.
