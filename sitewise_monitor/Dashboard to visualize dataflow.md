@@ -7,4 +7,6 @@
 5. Produce similar visuals for the rest of sensors in Demo Pump Asset 1.
 6. Edit the name of widget as: Sensor 0-5.
 
-Create the same visualization for Demo Pump Asset 2. 
+7. Create the same visualization for Demo Pump Asset 2. 
+
+8. Finally, replace the default dashboard name New dashboard with something meaningful, e.g. DemoPumpStation. Click on Save dashboard to save your dashboard.
