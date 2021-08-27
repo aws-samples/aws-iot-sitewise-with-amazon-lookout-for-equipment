@@ -34,6 +34,31 @@ This data pipeline comprises of four parts:
 For demonstration purpose, an AWS IoT SiteWise simulator is used to simulate the measurement value updates for industrial asset in this blog. For real industrial applications, OT team can configure data sources, such as OPC-UA server, to ingest asset data to AWS IoT SiteWise. 
 In this demo, an asset group with two level of hierarchy deployed. In reality, the number of hierarchies and the number of assets within each hierarchy can be significantly more (https://docs.aws.amazon.com/general/latest/gr/iot-sitewise.html). However, since Lambda functions used in data engineering pipeline can be scaled up to meet the demand with concurrent invocations of Lambda functions, so this solution can be easily extended to large scale industrial assets.
 
+## Clean Up procedures
+CloudFormation stacks:
+To avoid incurring future charges, navigate to the CloudFormation console and delete two CloudFormation stacks created from this blog walkthrough. 
+
+Cloud Watch Log groups: 
+
+* Delete cloud watch log groups created associated with asset alarm models, asset models and assets creation. 
+* Delete log groups associated with Lambda functions created in this solution.   
+
+S3 Buckets: 
+
+* Navigate  to the S3 console, 
+* Empty and delete these two S3 buckets created in the second CloudFormation for Amazon Lookout for Equipment training and inference.  
+* Empty and delete the S3 bucket used for Lambda/Lambda layer code storage.
+
+SiteWise Monitor:
+
+* Delete SiteWise monitor dashboards first, then delete SiteWise project you created for this SiteWise demo.
+
+Lookout for Equipment:
+
+* Stop the inference scheduler, and delete Inference Schedulers for models developed in Lookout for Equipment
+* Delete Inference Scheduler developed in Lookout for Equipment
+* Delete datasets developed in Lookout for Equipment  
+
 ## Security
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
