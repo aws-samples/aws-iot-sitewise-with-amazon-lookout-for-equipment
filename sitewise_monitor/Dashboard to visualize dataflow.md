@@ -32,4 +32,4 @@
 3. Change widget name as “Impeller Component L4EScore”;
 4. Adjust the time range on the top right of the dashboard, to zoom in this visual and evaluate sensor L4EScore diagnoized by Lookout for Equipement within 5 minutes interval.
 
-![alt text](https://github.com/aws-samples/aws-iot-sitewise-with-amazon-lookout-for-equipment/blob/main/imag/sensorX%20L4Escore.JPG?raw=true)
+![alt text](https://github.com/aws-samples/aws-iot-sitewise-with-amazon-lookout-for-equipment/blob/main/imag/impeller_l4e.JPG?raw=true)
