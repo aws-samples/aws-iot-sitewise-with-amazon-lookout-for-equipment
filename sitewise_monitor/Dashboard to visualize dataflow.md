@@ -26,3 +26,10 @@
 4. Change widget name as “SensorX L4EScore”.
 ![alt text](https://github.com/aws-samples/aws-iot-sitewise-with-amazon-lookout-for-equipment/blob/main/imag/sensorX%20L4Escore.JPG?raw=true)
 
+## Impeller Component L4EScore visual
+1. “Sensor6 L4EScore”, “Sensor7 L4EScore”, “Sensor8 L4EScore”, “Sensor9 L4EScore”, “Sensor10 L4EScore” and “Sensor11 L4EScore” are dragged from the right pane to the dashboard;
+2. Choose Bar widget for this visual;
+3. Change widget name as “Impeller Component L4EScore”;
+4. Adjust the time range on the top right of the dashboard, to zoom in this visual and evaluate sensor L4EScore diagnoized by Lookout for Equipement within 5 minutes interval.
+
+![alt text](https://github.com/aws-samples/aws-iot-sitewise-with-amazon-lookout-for-equipment/blob/main/imag/sensorX%20L4Escore.JPG?raw=true)
