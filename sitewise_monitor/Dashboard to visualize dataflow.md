@@ -33,3 +33,13 @@
 4. Adjust the time range on the top right of the dashboard, to zoom in this visual and evaluate sensor L4EScore diagnoized by Lookout for Equipement within 5 minutes interval.
 
 ![alt text](https://github.com/aws-samples/aws-iot-sitewise-with-amazon-lookout-for-equipment/blob/main/imag/impeller_l4e.JPG?raw=true)
+
+## Sensor signal comparison between Pump 1 and 2 visual
+In this visual, sensors from two components: Impeller and Pump are compared.  
+
+1. Sensor6 from both Demo Pump Asset 1 and Demo Pump Asset 2 are dragged from the right pane to the dashboard;
+2. Choose Line widget for this visual;
+3. Change widget name as “Sensor6 comparison for Asset 1 and Asset 2”;
+4. Sensor0 from both Demo Pump Asset 1 and Demo Pump Asset 2 are dragged from the right pane to a visual next to visual for Sensor 6;
+5. Change widget name as “Sensor0 comparison for Asset 1 and Asset2”.
+![alt text](https://github.com/aws-samples/aws-iot-sitewise-with-amazon-lookout-for-equipment/blob/main/imag/impeller_l4e.JPG?raw=true)
