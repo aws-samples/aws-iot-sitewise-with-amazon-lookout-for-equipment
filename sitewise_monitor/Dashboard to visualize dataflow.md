@@ -13,10 +13,16 @@
 8. Finally, replace the default dashboard name New dashboard with something meaningful, e.g. DemoPumpStation. Click on Save dashboard to save your dashboard.
 ![alt text](https://github.com/aws-samples/aws-iot-sitewise-with-amazon-lookout-for-equipment/blob/main/imag/sitewisemonitor1.JPG?raw=true)
 ## Instruction to Create the SiteWise dashboard to visualize Amazon Lookout for Equipment output in blog step 4
+## Demo Pump Alarm
 1. Three SiteWise alarms (“l4E Alarm (Demo Pump Asset 1)”, “l4E Alarm (Demo Pump Asset 2)” and “StationAbnormalyAlarm (Demo Pump Station Asset)”) are dragged from the right pane to the dashboard;
 2. Choose Grid widget for this visual;
 3. Change widget name as “Demo Pump Alarms”.
 4. Change this dashboard name to "Demo Pump Station", because the original dashboard is augmented in this step to show asset management for all assets within AWS IoT SiteWise. 
 ![alt text](https://github.com/aws-samples/aws-iot-sitewise-with-amazon-lookout-for-equipment/blob/main/imag/sitewisemonitor_dashboard.JPG?raw=true)
-
+## SensorX L4EScore visual
+1. “Sensor0 L4EScore”, “Sensor6 L4EScore”, “Sensor12 L4EScore”, “Sensor18 L4EScore”, “Sensor24 L4EScore” are dragged from the right pane to the dashboard;
+2. Choose Grid widget for this visual;
+3. Setup a threshold on this visual, so high “Sensor6 L4EScore” can be shown as red color for warning.
+4. Change widget name as “SensorX L4EScore”.
+![alt text](https://github.com/aws-samples/aws-iot-sitewise-with-amazon-lookout-for-equipment/blob/main/imag/sitewisemonitor_dashboard.JPG?raw=true)
 
