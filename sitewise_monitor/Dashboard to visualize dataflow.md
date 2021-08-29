@@ -24,5 +24,5 @@
 2. Choose Grid widget for this visual;
 3. Setup a threshold on this visual, so high “Sensor6 L4EScore” can be shown as red color for warning.
 4. Change widget name as “SensorX L4EScore”.
-![alt text](https://github.com/aws-samples/aws-iot-sitewise-with-amazon-lookout-for-equipment/blob/main/imag/sitewisemonitor_dashboard.JPG?raw=true)
+![alt text](https://github.com/aws-samples/aws-iot-sitewise-with-amazon-lookout-for-equipment/blob/main/imag/sensorX%20L4Escore.JPG?raw=true)
 
