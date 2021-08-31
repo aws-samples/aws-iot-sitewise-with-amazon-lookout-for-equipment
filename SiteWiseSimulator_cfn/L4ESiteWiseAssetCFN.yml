@@ -1,16 +1,5 @@
 # Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-
-#     http://www.apache.org/licenses/LICENSE-2.0
-
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
 ---
 AWSTemplateFormatVersion: '2010-09-09'
@@ -27,10 +16,6 @@ Outputs:
     Value:
       Ref: IoTSiteWiseDemoPumpAsset2  
 Parameters:
-  codebucket:
-    Type: String
-    Description: S3 location for lambda function that you saved
-    MinLength: 3
   DemoDurationDays:
     Type: Number
     Default: 7
@@ -145,8 +130,8 @@ Resources:
     Properties:
       Description: IoT SiteWise Demo function handling the lifecycle of IoTEvents Alarm Model resources. This function will be deleted at the end of the demo.
       Code:
-        S3Bucket: !Sub ${codebucket}
-        S3Key: L4E-IoTSiteWiseDemoDataGenerationFunction.zip
+        S3Bucket: !Sub lookoutforequipmentbucket-${AWS::Region}
+        S3Key: lambdafunction/L4E-IoTSiteWiseDemoDataGenerationFunction.zip
       Handler: iotevents_alarm_models.handler
       MemorySize: 128
       Role:
@@ -304,8 +289,8 @@ Resources:
     Properties:
       Description: IoT SiteWise Demo function handling the lifecycle of asset model resources. This function will be deleted at the end of the demo.
       Code:
-        S3Bucket: !Sub ${codebucket}
-        S3Key: L4E-IoTSiteWiseDemoDataGenerationFunction.zip
+        S3Bucket: !Sub lookoutforequipmentbucket-${AWS::Region}
+        S3Key: lambdafunction/L4E-IoTSiteWiseDemoDataGenerationFunction.zip
       Handler: sitewise_asset_models.handler
       MemorySize: 128
       Role:
@@ -922,8 +907,8 @@ Resources:
     Properties:
       Description: IoT SiteWise Demo function handling the lifecycle of asset resources. This function will be deleted at the end of the demo.
       Code:
-        S3Bucket: !Sub ${codebucket}
-        S3Key: L4E-IoTSiteWiseDemoDataGenerationFunction.zip
+        S3Bucket: !Sub lookoutforequipmentbucket-${AWS::Region}
+        S3Key: lambdafunction/L4E-IoTSiteWiseDemoDataGenerationFunction.zip
       Handler: sitewise_assets.handler
       MemorySize: 128
       Role:
@@ -1011,8 +996,8 @@ Resources:
     Properties:
       Description: IoT SiteWise Demo function handling data generation. This function will be deleted at the end of the demo.
       Code:
-        S3Bucket: !Sub ${codebucket}
-        S3Key: L4E-IoTSiteWiseDemoDataGenerationFunction.zip
+        S3Bucket: !Sub lookoutforequipmentbucket-${AWS::Region}
+        S3Key: lambdafunction/L4E-IoTSiteWiseDemoDataGenerationFunction.zip
       Handler: sitewise_data_generation.handler
       MemorySize: 256
       Role:
