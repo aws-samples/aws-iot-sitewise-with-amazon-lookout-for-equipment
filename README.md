@@ -47,7 +47,7 @@ S3 Buckets:
 
 * Navigate  to the S3 console, 
 * Empty and delete these two S3 buckets created in the second CloudFormation for Amazon Lookout for Equipment training and inference.  
-* Empty and delete the S3 bucket used for Lambda/Lambda layer code storage.
+* Empty S3 bucket for AWS IoT SiteWise data storage. 
 
 SiteWise Monitor:
 
