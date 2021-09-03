@@ -40,3 +40,19 @@
 * At the bottom of the page, select the check box that says *I acknowledge that Amazon CloudFormation might create IAM resources*. 
 * Choose *Create stack*. 
 
+## Clean up procedure
+
+* If you decide to relaunch the same cloudforamtion in your AWS account in the same region, pleaes follow the following Cleanup procedure to ensure resources created from the previous stack are deleted completely, since CloudFormation cannot create resources that already exist.
+
+CloudFormation stacks: To avoid incurring future charges, navigate to the CloudFormation console and delete the previous CloudFormation stack.
+
+Cloud Watch Log groups:
+
+    Delete cloud watch log groups created associated with asset alarm models, asset models and assets creation.
+    Delete log groups associated with Lambda functions created from the previous CloudFormation.
+
+S3 Buckets:
+
+    Navigate to the S3 console,
+    Empty and delete these two S3 buckets created in the previous CloudFormation for Amazon Lookout for Equipment training and inference.
+    Empty and delete the two S3 bucket used for SiteWise data storage.
